@@ -1,23 +1,27 @@
+mod workspace;
+
+use crate::workspace::Workspace;
 use anyhow::Result;
 use clap::{App, Arg, ArgMatches, SubCommand};
+use std::path::PathBuf;
 
 fn init(args: &ArgMatches) -> Result<()> {
     // Either acquire the user-supplied path or pick a default.
     let mut path = match args.value_of("path") {
-        Some(path) => std::path::PathBuf::from(path),
+        Some(path) => PathBuf::from(path),
         None => std::env::current_dir()?,
     };
-    path.push(".git");
 
-    let dirs = ["objects", "refs"];
-
-    for dir in dirs.iter() {
-        path.push(dir);
-        std::fs::create_dir_all(&path)?;
-        path.pop();
+    {
+        path.push(".git");
+        let dirs = ["objects", "refs"];
+        for dir in dirs.iter() {
+            path.push(dir);
+            std::fs::create_dir_all(&path)?;
+            path.pop();
+        }
+        path.pop(); // Remove ".git" path component
     }
-
-    path.pop(); // Remove .git
 
     println!(
         "Initialized empty Rit repository in {}",
@@ -26,25 +30,40 @@ fn init(args: &ArgMatches) -> Result<()> {
     Ok(())
 }
 
+fn commit(_args: &ArgMatches) -> Result<()> {
+    let root_path = std::env::current_dir()?;
+    let git_path = root_path.as_path().join(".git");
+    let _db_path = git_path.as_path().join("objects");
+
+    let workspace = Workspace::new(&root_path);
+    let files = workspace.list_files();
+
+    println!("Files: {:#?}", files);
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let args = App::new("Rusty git (rit)")
         .version("1.0")
         .author("Sean Klein")
-        .subcommands(vec![SubCommand::with_name("init")
-            .about("Initializes a git repo")
-            .arg(
-                Arg::with_name("path")
-                    .default_value(".")
-                    .takes_value(true)
-                    .help("Path to git repo which should be initialized"),
-            )])
+        .subcommands(vec![
+            SubCommand::with_name("init")
+                .about("Initializes a git repo")
+                .arg(
+                    Arg::with_name("path")
+                        .default_value(".")
+                        .takes_value(true)
+                        .help("Path to git repo which should be initialized"),
+                ),
+            SubCommand::with_name("commit").about("Record changes to the repository"),
+        ])
         .get_matches();
 
     match args.subcommand() {
         ("init", Some(args)) => init(args)?,
-        _ => {
-            eprintln!("Command not found");
-        }
+        ("commit", Some(args)) => commit(args)?,
+        _ => eprintln!("Command not found"),
     }
 
     Ok(())
