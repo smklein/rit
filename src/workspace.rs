@@ -1,18 +1,28 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+use std::fs::File;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
-pub struct Workspace<'a> {
-    root: &'a Path,
+pub struct Workspace {
+    root: PathBuf,
 }
 
-impl<'a> Workspace<'a> {
-    // TODO: AsRef path here would be better, right?
-    pub fn new(path: &'a Path) -> Self {
-        Workspace { root: path }
+impl Workspace {
+    pub fn new<P: AsRef<Path>>(path: P) -> Self {
+        Workspace {
+            root: PathBuf::from(path.as_ref().clone()),
+        }
+    }
+
+    pub fn read_file<P: AsRef<Path>>(path: P) -> Result<Vec<u8>> {
+        let mut f = File::open(path)?;
+        let mut result = Vec::new();
+        f.read_to_end(&mut result).map_err(|e| anyhow!(e))?;
+        Ok(result)
     }
 
     pub fn list_files(&self) -> Result<Vec<PathBuf>> {
-        let entries = std::fs::read_dir(self.root)?
+        let entries = std::fs::read_dir(self.root.as_path())?
             .map(|entry| entry.map(|entry| entry.path()))
             .collect::<Result<Vec<_>, std::io::Error>>()?
             .into_iter()

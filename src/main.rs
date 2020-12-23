@@ -1,9 +1,13 @@
+mod database;
 mod workspace;
 
+use crate::database::{Blob, Database};
 use crate::workspace::Workspace;
 use anyhow::Result;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use std::path::PathBuf;
+
+// TODO: Split commands into separate modules.
 
 fn init(args: &ArgMatches) -> Result<()> {
     // Either acquire the user-supplied path or pick a default.
@@ -33,12 +37,19 @@ fn init(args: &ArgMatches) -> Result<()> {
 fn commit(_args: &ArgMatches) -> Result<()> {
     let root_path = std::env::current_dir()?;
     let git_path = root_path.as_path().join(".git");
-    let _db_path = git_path.as_path().join("objects");
+    let db_path = git_path.as_path().join("objects");
 
     let workspace = Workspace::new(&root_path);
-    let files = workspace.list_files();
-
+    let files = workspace.list_files()?;
     println!("Files: {:#?}", files);
+
+    let database = Database::new(db_path);
+
+    for file in files {
+        let data = Workspace::read_file(file)?;
+        let blob = Blob::new(data);
+        database.store(blob)?;
+    }
 
     Ok(())
 }
