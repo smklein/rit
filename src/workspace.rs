@@ -10,7 +10,7 @@ pub struct Workspace {
 impl Workspace {
     pub fn new<P: AsRef<Path>>(path: P) -> Self {
         Workspace {
-            root: PathBuf::from(path.as_ref().clone()),
+            root: PathBuf::from(path.as_ref()),
         }
     }
 
@@ -34,10 +34,7 @@ impl Workspace {
     fn ignored(s: &Path) -> bool {
         if let Some(file) = s.file_name() {
             if let Some(file) = file.to_str() {
-                return match file.as_ref() {
-                    "." | ".." | ".git" => true,
-                    _ => false,
-                };
+                return matches!(file, "." | ".." | ".git");
             }
         }
         // If we can't unwrap the name, ignore whatever this thing is.

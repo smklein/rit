@@ -17,7 +17,7 @@ pub trait Storable {
     fn encoded_raw(&self) -> Vec<u8> {
         let mut content = Vec::new();
         content.extend_from_slice(self.type_name().as_bytes());
-        content.extend_from_slice(" ".as_bytes());
+        content.extend_from_slice(b" ");
         content.extend_from_slice(format!("{}\0", self.data().len()).as_bytes());
         content.extend_from_slice(self.data());
         content
@@ -45,7 +45,7 @@ pub trait Storable {
     /// Return the sha1 of the object, as a hex encoded string.
     fn sha1(&self) -> String {
         let mut hasher = Sha1::new();
-        hasher.update(self.encoded_raw().clone());
+        hasher.update(self.encoded_raw());
         hex::encode(hasher.finalize())
     }
 }
@@ -60,7 +60,7 @@ impl Database {
     /// git database path.
     pub fn new<P: AsRef<Path>>(path: P) -> Self {
         Database {
-            root: PathBuf::from(path.as_ref().clone()),
+            root: PathBuf::from(path.as_ref()),
         }
     }
 
