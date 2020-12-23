@@ -1,7 +1,7 @@
 use crate::database::Storable;
 use crate::entry::Entry;
 
-static MODE: &'static str = "100644";
+static MODE: &str = "100644";
 
 pub struct Tree {
     // Sorted list of entries by name.
@@ -26,7 +26,6 @@ impl Tree {
                 .map(|slice| slice.to_vec())
                 .flatten()
                 .collect::<Vec<u8>>()
-                .clone()
             })
             .flatten()
             .collect::<Vec<u8>>();
