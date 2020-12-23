@@ -1,7 +1,11 @@
 mod database;
+mod entry;
+mod tree;
 mod workspace;
 
-use crate::database::{Blob, Database};
+use crate::database::{Blob, Database, Storable};
+use crate::entry::Entry;
+use crate::tree::Tree;
 use crate::workspace::Workspace;
 use anyhow::Result;
 use clap::{App, Arg, ArgMatches, SubCommand};
@@ -40,16 +44,22 @@ fn commit(_args: &ArgMatches) -> Result<()> {
     let db_path = git_path.as_path().join("objects");
 
     let workspace = Workspace::new(&root_path);
+    let database = Database::new(db_path);
+
     let files = workspace.list_files()?;
     println!("Files in workspace: {:#?}", files);
 
-    let database = Database::new(db_path);
-
+    let mut entries = Vec::new();
     for file in files {
-        let data = Workspace::read_file(file)?;
+        let data = workspace.read_file(&file)?;
         let blob = Blob::new(data);
-        database.store(blob)?;
+        database.store(&blob)?;
+
+        entries.push(Entry::new(file, blob.oid()));
     }
+
+    let tree = Tree::new(entries);
+    database.store(&tree)?;
 
     Ok(())
 }

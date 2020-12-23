@@ -4,6 +4,29 @@ use std::fs::{create_dir_all, rename, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+#[derive(PartialEq, PartialOrd, Eq, Ord)]
+pub struct ObjectID {
+    id: Vec<u8>,
+}
+
+impl ObjectID {
+    fn new(storable: &(impl Storable + ?Sized)) -> Self {
+        let mut hasher = Sha1::new();
+        hasher.update(storable.encoded_raw());
+        ObjectID {
+            id: hasher.finalize().as_mut_slice().to_vec(),
+        }
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        self.id.as_slice()
+    }
+
+    pub fn as_str(&self) -> String {
+        hex::encode(self.as_bytes())
+    }
+}
+
 /// An entity which may be stored within the git object database.
 pub trait Storable {
     // Identifies which object is serialized here.
@@ -12,7 +35,10 @@ pub trait Storable {
     // Returns a byte representation of the underlying data.
     fn data(&self) -> &Vec<u8>;
 
-    // TODO: Could be fancy, use types to enforce encryption.
+    // TODO: Could be fancy, use types to enforce compression.
+
+    // TODO: We re-invoked "encoded_raw" pretty frequently; might be
+    // worth restructuring this code to reduce the number of invocations.
 
     fn encoded_raw(&self) -> Vec<u8> {
         let mut content = Vec::new();
@@ -23,7 +49,7 @@ pub trait Storable {
         content
     }
 
-    /// Serialize the opbject to a byte steam.
+    /// Serializes the object to a byte steam.
     fn serialize(&self) -> Result<Vec<u8>> {
         let content = self.encoded_raw();
 
@@ -33,20 +59,12 @@ pub trait Storable {
         encoder.write_all(&content)?;
         let compressed = encoder.finish()?;
 
-        println!(
-            "Content compressed from {} --> {} bytes",
-            content.len(),
-            compressed.len()
-        );
-
         Ok(compressed)
     }
 
-    /// Return the sha1 of the object, as a hex encoded string.
-    fn sha1(&self) -> String {
-        let mut hasher = Sha1::new();
-        hasher.update(self.encoded_raw());
-        hex::encode(hasher.finalize())
+    /// Returns the ID of the object.
+    fn oid(&self) -> ObjectID {
+        ObjectID::new(self)
     }
 }
 
@@ -64,11 +82,10 @@ impl Database {
         }
     }
 
-    /// Add a new blob object to the Git object store.
-    pub fn store(&self, object: impl Storable) -> Result<()> {
+    /// Add a new object to the Git object store.
+    pub fn store(&self, object: &impl Storable) -> Result<()> {
         let content = object.serialize()?;
-        let object_id = object.sha1();
-        println!("Object ID: {}", object_id);
+        let object_id = object.oid().as_str();
         let prefix = &object_id[0..2];
         let suffix = &object_id[2..];
 
