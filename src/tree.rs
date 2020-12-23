@@ -3,6 +3,8 @@ use crate::entry::Entry;
 
 static MODE: &str = "100644";
 
+/// Implements a git tree object, a storable list of
+/// entries.
 pub struct Tree {
     // Sorted list of entries by name.
     _entries: Vec<Entry>,

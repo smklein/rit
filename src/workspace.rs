@@ -18,6 +18,12 @@ impl AsRef<Path> for WorkspacePath {
 
 impl WorkspacePath {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
+        // This is to help prevent user error; we want the incoming
+        // paths to all be relative to the workspace root.
+        //
+        // Absolute paths would contain non-repository information,
+        // which would cause issues when paths are embedded within
+        // the object store.
         if path.as_ref().is_absolute() {
             return Err(anyhow!("Absolute paths disallowed"));
         }
@@ -38,6 +44,7 @@ impl Workspace {
         }
     }
 
+    /// Read the entirety of a file within the workspace.
     pub fn read_file(&self, path: &WorkspacePath) -> Result<Vec<u8>> {
         let real_path = self.root.join(path);
         let mut f = File::open(real_path)?;
@@ -46,6 +53,8 @@ impl Workspace {
         Ok(result)
     }
 
+    /// Returns a list of files within the workspace, all
+    /// relative to the workspace root.
     pub fn list_files(&self) -> Result<Vec<WorkspacePath>> {
         let entries = std::fs::read_dir(self.root.as_path())?
             .map(|entry| entry.map(|entry| WorkspacePath::new(entry.file_name())))
