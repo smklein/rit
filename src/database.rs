@@ -12,29 +12,40 @@ pub trait Storable {
     // Returns a byte representation of the underlying data.
     fn data(&self) -> &Vec<u8>;
 
-    /// Serialize the opbject to a byte steam.
-    fn serialize(&self) -> Result<Vec<u8>> {
+    // TODO: Could be fancy, use types to enforce encryption.
+
+    fn encoded_raw(&self) -> Vec<u8> {
         let mut content = Vec::new();
         content.extend_from_slice(self.type_name().as_bytes());
         content.extend_from_slice(" ".as_bytes());
-        content.extend_from_slice(format!("{}", self.data().len()).as_bytes());
+        content.extend_from_slice(format!("{}\0", self.data().len()).as_bytes());
         content.extend_from_slice(self.data());
+        content
+    }
 
-        // Use FLATE2 to compress the file so it uses less on-disk storage.
+    /// Serialize the opbject to a byte steam.
+    fn serialize(&self) -> Result<Vec<u8>> {
+        let content = self.encoded_raw();
+
+        // Use zlib to compress the file so it uses less on-disk storage.
         let compression = flate2::Compression::fast();
-        let zlib_header = false;
-        let mut compressor = flate2::Compress::new(compression, zlib_header);
-        let mut compressed = Vec::new();
-        let flush = flate2::FlushCompress::None;
-        compressor.compress(&content, &mut compressed, flush)?;
+        let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), compression);
+        encoder.write_all(&content)?;
+        let compressed = encoder.finish()?;
+
+        println!(
+            "Content compressed from {} --> {} bytes",
+            content.len(),
+            compressed.len()
+        );
 
         Ok(compressed)
     }
 
-    /// Return the sha1 of the blob, as a hex encoded string.
+    /// Return the sha1 of the object, as a hex encoded string.
     fn sha1(&self) -> String {
         let mut hasher = Sha1::new();
-        hasher.update(self.data().clone());
+        hasher.update(self.encoded_raw().clone());
         hex::encode(hasher.finalize())
     }
 }
@@ -57,7 +68,8 @@ impl Database {
     pub fn store(&self, object: impl Storable) -> Result<()> {
         let content = object.serialize()?;
         let object_id = object.sha1();
-        let prefix = &object_id[0..1];
+        println!("Object ID: {}", object_id);
+        let prefix = &object_id[0..2];
         let suffix = &object_id[2..];
 
         // First two characters of the object ID form a directory.

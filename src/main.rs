@@ -41,7 +41,7 @@ fn commit(_args: &ArgMatches) -> Result<()> {
 
     let workspace = Workspace::new(&root_path);
     let files = workspace.list_files()?;
-    println!("Files: {:#?}", files);
+    println!("Files in workspace: {:#?}", files);
 
     let database = Database::new(db_path);
 
@@ -74,7 +74,7 @@ fn main() -> Result<()> {
     match args.subcommand() {
         ("init", Some(args)) => init(args)?,
         ("commit", Some(args)) => commit(args)?,
-        _ => eprintln!("Command not found"),
+        _ => eprintln!("Unknown command, try 'rit help'"),
     }
 
     Ok(())
