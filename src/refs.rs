@@ -1,5 +1,7 @@
 use crate::database::ObjectID;
-use anyhow::{anyhow, Result};
+use crate::lockfile::LockFile;
+use anyhow::Result;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 /// Shorthand names for git object IDs.
@@ -19,8 +21,11 @@ impl Refs {
         }
     }
 
+    /// Updates the HEAD file, returning an error if it is already in use.
     pub fn update_head(&self, oid: &ObjectID) -> Result<()> {
-        std::fs::write(self.head_path(), oid.as_str()).map_err(|e| anyhow!(e))
+        let mut head = LockFile::new(self.head_path())?;
+        head.writer().write_all(oid.as_str().as_bytes())?;
+        head.commit()
     }
 
     pub fn read_head(&self) -> Result<ObjectID> {

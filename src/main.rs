@@ -2,6 +2,7 @@ mod author;
 mod commit;
 mod database;
 mod entry;
+mod lockfile;
 mod refs;
 mod tree;
 mod workspace;

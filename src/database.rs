@@ -114,6 +114,13 @@ impl Database {
         let temp_filename = format!("{}.tmp", suffix);
         let mut final_path = path.clone();
         final_path.push(suffix);
+        // Someone else already made this object. Since the object store
+        // *should* be immutable, this means it already has the content we want
+        // too.
+        if final_path.exists() {
+            return Ok(());
+        }
+
         let mut tmp_path = path;
         tmp_path.push(&temp_filename);
 
