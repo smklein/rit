@@ -2,6 +2,7 @@ mod author;
 mod commit;
 mod database;
 mod entry;
+mod refs;
 mod tree;
 mod workspace;
 
@@ -9,6 +10,7 @@ use crate::author::Author;
 use crate::commit::Commit;
 use crate::database::{Blob, Database, Storable};
 use crate::entry::Entry;
+use crate::refs::Refs;
 use crate::tree::Tree;
 use crate::workspace::Workspace;
 use anyhow::{anyhow, Result};
@@ -49,6 +51,7 @@ fn commit(args: &ArgMatches) -> Result<()> {
 
     let workspace = Workspace::new(&root_path);
     let database = Database::new(db_path);
+    let refs = Refs::new(&git_path);
 
     let files = workspace.list_files()?;
 
@@ -64,6 +67,7 @@ fn commit(args: &ArgMatches) -> Result<()> {
     let tree = Tree::new(entries);
     database.store(&tree)?;
 
+    let parent = refs.read_head().ok();
     let name = env::var("GIT_AUTHOR_NAME")?;
     let email = env::var("GIT_AUTHOR_EMAIL")?;
 
@@ -73,8 +77,9 @@ fn commit(args: &ArgMatches) -> Result<()> {
         .ok_or_else(|| anyhow!("No commit message"))?
         .to_string();
 
-    let commit = Commit::new(tree.oid(), author, message);
+    let commit = Commit::new(&parent, &tree.oid(), author, message);
     database.store(&commit)?;
+    refs.update_head(&commit.oid())?;
 
     let head_path = git_path.join("HEAD");
     let mut head = OpenOptions::new()
@@ -83,8 +88,15 @@ fn commit(args: &ArgMatches) -> Result<()> {
         .open(&head_path)?;
     head.write_all(commit.oid().as_str().as_bytes())?;
 
+    let root_msg = if parent.is_some() {
+        "(root-commit) "
+    } else {
+        ""
+    };
+
     println!(
-        "[(root-commit) {} {}",
+        "[{}{}] {}",
+        root_msg,
         commit.oid().as_str(),
         commit
             .message()

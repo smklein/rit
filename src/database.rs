@@ -1,10 +1,10 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use sha1::{Digest, Sha1};
 use std::fs::{create_dir_all, rename, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-#[derive(PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Clone, PartialEq, PartialOrd, Eq, Ord)]
 pub struct ObjectID {
     id: Vec<u8>,
 }
@@ -16,6 +16,23 @@ impl ObjectID {
         ObjectID {
             id: hasher.finalize().as_mut_slice().to_vec(),
         }
+    }
+
+    /// Creates an ObjectID from a hexadecimal encoded string.
+    pub fn from_str<S: AsRef<str>>(s: S) -> Result<Self> {
+        let id = hex::decode(s.as_ref())?;
+        if id.len() != sha1::Sha1::output_size() {
+            return Err(anyhow!("Invalid ObjectID length"));
+        }
+        Ok(ObjectID { id })
+    }
+
+    /// Creates an ObjectID from a raw byte sequence.
+    pub fn from_bytes(b: &[u8]) -> Result<Self> {
+        if b.len() != sha1::Sha1::output_size() {
+            return Err(anyhow!("Invalid ObjectID length"));
+        }
+        Ok(ObjectID { id: b.to_vec() })
     }
 
     pub fn as_bytes(&self) -> &[u8] {
