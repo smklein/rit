@@ -1,8 +1,6 @@
 use crate::database::Storable;
 use crate::entry::Entry;
 
-static MODE: &str = "100644";
-
 /// Implements a git tree object, a storable list of
 /// entries.
 pub struct Tree {
@@ -19,7 +17,7 @@ impl Tree {
             .map(|entry| {
                 // Entry format: "{MODE} {NAME}\0{OID}"
                 vec![
-                    format!("{} ", MODE).as_bytes(),
+                    format!("{} ", entry.mode().as_str()).as_bytes(),
                     entry.path_bytes(),
                     &[b'\0'],
                     entry.oid().as_bytes(),

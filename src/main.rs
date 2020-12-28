@@ -10,7 +10,7 @@ mod workspace;
 use crate::author::Author;
 use crate::commit::Commit;
 use crate::database::{Blob, Database, Storable};
-use crate::entry::Entry;
+use crate::entry::{Entry, Mode};
 use crate::refs::Refs;
 use crate::tree::Tree;
 use crate::workspace::Workspace;
@@ -19,6 +19,7 @@ use clap::{App, Arg, ArgMatches, SubCommand};
 use std::env;
 use std::fs::OpenOptions;
 use std::io::Write;
+use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 
 // TODO: Split commands into separate modules.
@@ -59,10 +60,21 @@ fn commit(args: &ArgMatches) -> Result<()> {
     let mut entries = Vec::new();
     for file in files {
         let data = workspace.read_file(&file)?;
+
+        // Calculate the OID, and ensuure the entry exists in the object
+        // store if it does not already exist there.
         let blob = Blob::new(data);
         database.store(&blob)?;
 
-        entries.push(Entry::new(file, blob.oid()));
+        // Identify if the entry is executable or not.
+        let metadata = workspace.metadata(&file)?;
+        let mode = if metadata.permissions().mode() & 0b111 != 0 {
+            Mode::ReadWriteExecute
+        } else {
+            Mode::ReadWrite
+        };
+
+        entries.push(Entry::new(file, blob.oid(), mode));
     }
 
     let tree = Tree::new(entries);

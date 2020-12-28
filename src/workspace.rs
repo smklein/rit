@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use std::fs::File;
+use std::fs::{File, Metadata};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
@@ -51,6 +51,10 @@ impl Workspace {
         let mut result = Vec::new();
         f.read_to_end(&mut result).map_err(|e| anyhow!(e))?;
         Ok(result)
+    }
+
+    pub fn metadata(&self, path: &WorkspacePath) -> Result<Metadata> {
+        std::fs::metadata(self.root.join(path)).map_err(|e| anyhow!(e))
     }
 
     /// Returns a list of files within the workspace, all
