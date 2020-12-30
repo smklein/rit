@@ -1,4 +1,5 @@
 mod author;
+mod commands;
 mod commit;
 mod database;
 mod entry;
@@ -7,119 +8,9 @@ mod refs;
 mod tree;
 mod workspace;
 
-use crate::author::Author;
-use crate::commit::Commit;
-use crate::database::{Blob, Database, Storable};
-use crate::entry::{Entry, Mode};
-use crate::refs::Refs;
-use crate::tree::Tree;
-use crate::workspace::Workspace;
-use anyhow::{anyhow, Result};
-use clap::{App, Arg, ArgMatches, SubCommand};
-use std::env;
-use std::fs::OpenOptions;
-use std::io::Write;
-use std::os::unix::fs::PermissionsExt;
-use std::path::PathBuf;
-
-// TODO: Split commands into separate modules.
-
-fn init(args: &ArgMatches) -> Result<()> {
-    // Either acquire the user-supplied path or pick a default.
-    let mut path = match args.value_of("path") {
-        Some(path) => PathBuf::from(path),
-        None => env::current_dir()?,
-    };
-
-    path.push(".git");
-    let dirs = ["objects", "refs"];
-    for dir in dirs.iter() {
-        path.push(dir);
-        std::fs::create_dir_all(&path)?;
-        path.pop();
-    }
-
-    println!(
-        "Initialized empty Rit repository in {}",
-        std::fs::canonicalize(&path)?.as_path().display()
-    );
-    Ok(())
-}
-
-fn commit(args: &ArgMatches) -> Result<()> {
-    let root_path = env::current_dir()?;
-    let git_path = root_path.as_path().join(".git");
-    let db_path = git_path.as_path().join("objects");
-
-    let workspace = Workspace::new(&root_path);
-    let database = Database::new(db_path);
-    let refs = Refs::new(&git_path);
-
-    let files = workspace.list_files()?;
-
-    let mut entries = Vec::new();
-    for file in files {
-        let data = workspace.read_file(&file)?;
-
-        // Calculate the OID, and ensuure the entry exists in the object
-        // store if it does not already exist there.
-        let blob = Blob::new(data);
-        database.store(&blob)?;
-
-        // Identify if the entry is executable or not.
-        let metadata = workspace.metadata(&file)?;
-        let mode = if metadata.permissions().mode() & 0b111 != 0 {
-            Mode::ReadWriteExecute
-        } else {
-            Mode::ReadWrite
-        };
-
-        entries.push(Entry::new(file, blob.oid(), mode));
-    }
-
-    let tree = Tree::new(entries);
-    database.store(&tree)?;
-
-    let parent = refs.read_head().ok();
-    let name = env::var("GIT_AUTHOR_NAME")?;
-    let email = env::var("GIT_AUTHOR_EMAIL")?;
-
-    let author = Author::new(name, email, std::time::SystemTime::now());
-    let message = args
-        .value_of("message")
-        .ok_or_else(|| anyhow!("No commit message"))?
-        .to_string();
-
-    let commit = Commit::new(&parent, &tree.oid(), author, message);
-    database.store(&commit)?;
-    refs.update_head(&commit.oid())?;
-
-    let head_path = git_path.join("HEAD");
-    let mut head = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .open(&head_path)?;
-    head.write_all(commit.oid().as_str().as_bytes())?;
-
-    let root_msg = if parent.is_some() {
-        "(root-commit) "
-    } else {
-        ""
-    };
-
-    println!(
-        "[{}{}] {}",
-        root_msg,
-        commit.oid().as_str(),
-        commit
-            .message()
-            .lines()
-            .next()
-            .unwrap_or("<No commit message>"),
-    );
-
-    Ok(())
-}
+use crate::commands::{commit, init, InitArgs};
+use anyhow::Result;
+use clap::{App, Arg, SubCommand};
 
 fn main() -> Result<()> {
     let args = App::new("Rusty git (rit)")
@@ -147,7 +38,12 @@ fn main() -> Result<()> {
         .get_matches();
 
     match args.subcommand() {
-        ("init", Some(args)) => init(args)?,
+        ("init", Some(args)) => {
+            let args = InitArgs {
+                path: args.value_of("path"),
+            };
+            init(args)?;
+        }
         ("commit", Some(args)) => commit(args)?,
         _ => eprintln!("Unknown command, try 'rit help'"),
     }

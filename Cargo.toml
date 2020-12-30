@@ -13,3 +13,7 @@ clap = "2.33"
 flate2 = "1.0.19"
 hex = "0.3.1"
 sha-1 = "0.9.2"
+
+[dev-dependencies]
+tempdir = "0.3.7"
+directory_compare = "0.1.1"
