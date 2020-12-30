@@ -6,8 +6,6 @@ use crate::refs::Refs;
 use crate::tree::Tree;
 use crate::workspace::Workspace;
 use anyhow::{anyhow, Result};
-use clap::ArgMatches;
-use std::env;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
@@ -17,13 +15,14 @@ use std::path::PathBuf;
 
 pub struct InitArgs<'a> {
     pub path: Option<&'a str>,
+    pub cwd: PathBuf,
 }
 
-pub fn init(args: InitArgs<'_>) -> Result<()> {
+pub fn init(args: InitArgs) -> Result<()> {
     // Either acquire the user-supplied path or pick a default.
     let mut path = match args.path {
         Some(path) => PathBuf::from(path),
-        None => env::current_dir()?,
+        None => args.cwd,
     };
 
     path.push(".git");
@@ -44,8 +43,15 @@ pub fn init(args: InitArgs<'_>) -> Result<()> {
     Ok(())
 }
 
-pub fn commit(args: &ArgMatches) -> Result<()> {
-    let root_path = env::current_dir()?;
+pub struct CommitArgs<'a> {
+    pub cwd: PathBuf,
+    pub message: Option<&'a str>,
+    pub name: String,
+    pub email: String,
+}
+
+pub fn commit(args: CommitArgs) -> Result<()> {
+    let root_path = args.cwd;
     let git_path = root_path.as_path().join(".git");
     let db_path = git_path.as_path().join("objects");
 
@@ -79,12 +85,10 @@ pub fn commit(args: &ArgMatches) -> Result<()> {
     database.store(&tree)?;
 
     let parent = refs.read_head().ok();
-    let name = env::var("GIT_AUTHOR_NAME")?;
-    let email = env::var("GIT_AUTHOR_EMAIL")?;
 
-    let author = Author::new(name, email, std::time::SystemTime::now());
+    let author = Author::new(args.name, args.email, std::time::SystemTime::now());
     let message = args
-        .value_of("message")
+        .message
         .ok_or_else(|| anyhow!("No commit message"))?
         .to_string();
 
@@ -124,6 +128,7 @@ mod tests {
     use super::*;
     use anyhow::{anyhow, Result};
     use directory_compare::directory_compare;
+    use std::env;
     use std::process::Command;
     use tempdir::TempDir;
 
@@ -141,6 +146,7 @@ mod tests {
         // Invoke manual version.
         init(InitArgs {
             path: Some(test_dir.path().as_os_str().to_str().unwrap()),
+            cwd: env::current_dir()?,
         })?;
 
         // Compare the outputs for known paths.

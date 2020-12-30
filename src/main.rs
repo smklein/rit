@@ -8,9 +8,10 @@ mod refs;
 mod tree;
 mod workspace;
 
-use crate::commands::{commit, init, InitArgs};
+use crate::commands::{commit, init, CommitArgs, InitArgs};
 use anyhow::Result;
 use clap::{App, Arg, SubCommand};
+use std::env;
 
 fn main() -> Result<()> {
     let args = App::new("Rusty git (rit)")
@@ -41,10 +42,19 @@ fn main() -> Result<()> {
         ("init", Some(args)) => {
             let args = InitArgs {
                 path: args.value_of("path"),
+                cwd: env::current_dir()?,
             };
             init(args)?;
         }
-        ("commit", Some(args)) => commit(args)?,
+        ("commit", Some(args)) => {
+            let args = CommitArgs {
+                cwd: env::current_dir()?,
+                message: args.value_of("message"),
+                name: env::var("GIT_AUTHOR_NAME")?,
+                email: env::var("GIT_AUTHOR_EMAIL")?,
+            };
+            commit(args)?;
+        }
         _ => eprintln!("Unknown command, try 'rit help'"),
     }
 
