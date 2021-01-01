@@ -4,7 +4,7 @@ use std::fs::{create_dir_all, rename, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-#[derive(Clone, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Clone, Debug, PartialEq, PartialOrd, Eq, Ord)]
 pub struct ObjectID {
     id: Vec<u8>,
 }

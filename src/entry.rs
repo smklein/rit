@@ -1,8 +1,8 @@
 use crate::database::ObjectID;
+use crate::workspace::WorkspacePath;
 use std::os::unix::ffi::OsStrExt;
-use std::path::{Path, PathBuf};
 
-#[derive(PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Debug, PartialEq, PartialOrd, Eq, Ord)]
 pub enum Mode {
     ReadWriteExecute,
     ReadWrite,
@@ -17,24 +17,24 @@ impl Mode {
     }
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Entry {
-    path: PathBuf,
+    path: WorkspacePath,
     oid: ObjectID,
     mode: Mode,
 }
 
 impl Entry {
-    pub fn new<P: AsRef<Path>>(path: P, oid: ObjectID, mode: Mode) -> Self {
+    pub fn new(path: WorkspacePath, oid: ObjectID, mode: Mode) -> Self {
         Entry {
-            path: PathBuf::from(path.as_ref()),
+            path: path,
             oid,
             mode,
         }
     }
 
     pub fn path_bytes(&self) -> &[u8] {
-        self.path.as_path().as_os_str().as_bytes()
+        self.path.as_partial_path().as_os_str().as_bytes()
     }
 
     pub fn oid(&self) -> &ObjectID {
