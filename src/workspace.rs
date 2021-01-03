@@ -59,16 +59,53 @@ impl Workspace {
         std::fs::metadata(self.root.join(path.as_partial_path())).map_err(|e| anyhow!(e))
     }
 
-    /// Returns a list of files within the workspace, all
-    /// relative to the workspace root.
+    /// Returns a sorted list of files within the workspace, all
+    /// relative to the provided path.
     pub fn list_files(&self) -> Result<Vec<WorkspacePath>> {
-        let entries = std::fs::read_dir(self.root.as_path())?
-            .map(|entry| entry.map(|entry| WorkspacePath::new(entry.file_name())))
+        let mut list = self.list_files_r(None)?;
+        list.sort();
+        Ok(list)
+    }
+
+    // Recursive helper for list_files.
+    //
+    // If no path is provided, returns `WorkspacePath` objects within the
+    // workspace root.
+    fn list_files_r(&self, path: Option<&WorkspacePath>) -> Result<Vec<WorkspacePath>> {
+        // Absolute path to directory in which we'll be searching.
+        let dir = path
+            .map(|workspace_path| self.full_path(workspace_path))
+            .unwrap_or_else(|| self.root.clone());
+
+        let base = path
+            .map(|workspace_path| workspace_path.as_partial_path())
+            .unwrap_or_else(|| Path::new(""));
+
+        let entries: Vec<WorkspacePath> = std::fs::read_dir(dir)?
+            .flat_map(|entry| {
+                entry.map(|entry| {
+                    // The entry_path represents the full portion of the path
+                    // relative to the workspace root.
+                    let entry_path = WorkspacePath::new(base.join(entry.file_name()))?;
+                    let file_type = match entry.file_type() {
+                        Ok(file_type) => file_type,
+                        Err(e) => return Err(anyhow!(e)),
+                    };
+
+                    if Workspace::ignored(&entry_path) {
+                        Ok(vec![])
+                    } else if file_type.is_dir() {
+                        let mut nested_entries = self.list_files_r(Some(&entry_path))?;
+                        nested_entries.push(entry_path);
+                        Ok(nested_entries)
+                    } else {
+                        Ok(vec![entry_path])
+                    }
+                })
+            })
             .flatten()
-            .collect::<Result<Vec<WorkspacePath>>>()?
-            .into_iter()
-            .filter(|entry| !Workspace::ignored(&entry))
-            .collect::<Vec<_>>();
+            .flatten()
+            .collect::<Vec<WorkspacePath>>();
         Ok(entries)
     }
 
@@ -78,7 +115,6 @@ impl Workspace {
                 return matches!(file, "." | ".." | ".git");
             }
         }
-        // If we can't unwrap the name, ignore whatever this thing is.
-        true
+        false
     }
 }

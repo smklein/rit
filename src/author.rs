@@ -1,14 +1,13 @@
-use chrono::{DateTime, Utc};
-use std::time::SystemTime;
+use chrono::{DateTime, FixedOffset, Utc};
 
 pub struct Author {
     name: String,
     email: String,
-    time: SystemTime,
+    time: DateTime<FixedOffset>,
 }
 
 impl Author {
-    pub fn new(name: String, email: String, time: SystemTime) -> Self {
+    pub fn new(name: String, email: String, time: DateTime<FixedOffset>) -> Self {
         Author { name, email, time }
     }
 

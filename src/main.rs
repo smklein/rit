@@ -52,6 +52,7 @@ fn main() -> Result<()> {
                 message: args.value_of("message"),
                 name: env::var("GIT_AUTHOR_NAME")?,
                 email: env::var("GIT_AUTHOR_EMAIL")?,
+                time: chrono::Local::now().into(),
             };
             commit(args)?;
         }

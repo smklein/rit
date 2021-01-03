@@ -15,6 +15,7 @@ impl Tree {
         let data = entries
             .iter()
             .map(|entry| {
+                println!("Tree entry path: {}", entry.path().display());
                 // Entry format: "{MODE} {NAME}\0{OID}"
                 vec![
                     format!("{} ", entry.mode().as_str()).as_bytes(),

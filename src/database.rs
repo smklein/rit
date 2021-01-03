@@ -27,6 +27,7 @@ impl ObjectID {
         Ok(ObjectID { id })
     }
 
+    /*
     /// Creates an ObjectID from a raw byte sequence.
     pub fn from_bytes(b: &[u8]) -> Result<Self> {
         if b.len() != sha1::Sha1::output_size() {
@@ -34,6 +35,7 @@ impl ObjectID {
         }
         Ok(ObjectID { id: b.to_vec() })
     }
+    */
 
     pub fn as_bytes(&self) -> &[u8] {
         self.id.as_slice()

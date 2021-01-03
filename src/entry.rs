@@ -1,6 +1,7 @@
 use crate::database::ObjectID;
 use crate::workspace::WorkspacePath;
 use std::os::unix::ffi::OsStrExt;
+use std::path::Path;
 
 #[derive(Debug, PartialEq, PartialOrd, Eq, Ord)]
 pub enum Mode {
@@ -26,11 +27,11 @@ pub struct Entry {
 
 impl Entry {
     pub fn new(path: WorkspacePath, oid: ObjectID, mode: Mode) -> Self {
-        Entry {
-            path: path,
-            oid,
-            mode,
-        }
+        Entry { path, oid, mode }
+    }
+
+    pub fn path(&self) -> &Path {
+        self.path.as_partial_path().as_ref()
     }
 
     pub fn path_bytes(&self) -> &[u8] {
