@@ -45,18 +45,21 @@ impl Workspace {
         }
     }
 
+    /// Access the full path of a file within the workspace.
     pub fn full_path(&self, sub_path: &WorkspacePath) -> PathBuf {
         self.root.join(sub_path.as_partial_path())
     }
 
     /// Read the entirety of a file within the workspace.
     pub fn read_file(&self, path: &WorkspacePath) -> Result<Vec<u8>> {
-        let real_path = self.root.join(path.as_partial_path());
+        let real_path = self.full_path(path);
         std::fs::read(real_path).map_err(|e| anyhow!(e))
     }
 
+    /// Read a file's metadata within the workspace.
     pub fn metadata(&self, path: &WorkspacePath) -> Result<Metadata> {
-        std::fs::metadata(self.root.join(path.as_partial_path())).map_err(|e| anyhow!(e))
+        let real_path = self.full_path(path);
+        std::fs::metadata(real_path).map_err(|e| anyhow!(e))
     }
 
     /// Returns a sorted list of files within the workspace, all
@@ -116,5 +119,98 @@ impl Workspace {
             }
         }
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anyhow::Result;
+    use std::fs::{create_dir, File};
+    use tempdir::TempDir;
+
+    enum TestPath<P> {
+        File(P),
+        Dir(P),
+    }
+
+    struct TestDir(TempDir);
+
+    impl TestDir {
+        fn new(prefix: &str) -> Result<Self> {
+            Ok(TestDir(TempDir::new(prefix)?))
+        }
+
+        fn create<P: AsRef<Path>>(&self, path: TestPath<P>) -> Result<()> {
+            match path {
+                TestPath::File(path) => {
+                    let _ = File::create(self.0.path().join(path.as_ref()))?;
+                }
+                TestPath::Dir(path) => {
+                    let _ = create_dir(self.0.path().join(path.as_ref()))?;
+                }
+            };
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_full_path() {
+        let dir = TestDir::new("test_full_path").unwrap();
+        dir.create(TestPath::File("file.txt")).unwrap();
+
+        let workspace = Workspace::new(dir.0.path());
+        assert_eq!(
+            workspace.full_path(&WorkspacePath::new("").unwrap()),
+            dir.0.path()
+        );
+        assert_eq!(
+            workspace.full_path(&WorkspacePath::new("file.txt").unwrap()),
+            dir.0.path().join("file.txt"),
+        );
+    }
+
+    #[test]
+    fn test_list_files() {
+        let dir = TestDir::new("test_list_files").unwrap();
+        dir.create(TestPath::Dir("dir")).unwrap();
+        dir.create(TestPath::File("dir/file.txt")).unwrap();
+        dir.create(TestPath::Dir("dir/subdir")).unwrap();
+        dir.create(TestPath::File("dir/subdir/file.txt")).unwrap();
+        dir.create(TestPath::File("file.txt")).unwrap();
+
+        let workspace = Workspace::new(dir.0.path());
+        let files = workspace.list_files().unwrap();
+
+        assert_eq!(
+            vec![
+                WorkspacePath::new("dir").unwrap(),
+                WorkspacePath::new("dir/file.txt").unwrap(),
+                WorkspacePath::new("dir/subdir").unwrap(),
+                WorkspacePath::new("dir/subdir/file.txt").unwrap(),
+                WorkspacePath::new("file.txt").unwrap(),
+            ],
+            files
+        );
+    }
+
+    #[test]
+    fn test_ignore_git() {
+        let dir = TestDir::new("test_ignore_git").unwrap();
+        dir.create(TestPath::Dir(".git")).unwrap();
+        dir.create(TestPath::File(".git/objects")).unwrap();
+        dir.create(TestPath::Dir("not-git-dir")).unwrap();
+        dir.create(TestPath::File("not-git-file")).unwrap();
+
+        let workspace = Workspace::new(dir.0.path());
+        let files = workspace.list_files().unwrap();
+
+        assert_eq!(
+            vec![
+                WorkspacePath::new("not-git-dir").unwrap(),
+                WorkspacePath::new("not-git-file").unwrap(),
+            ],
+            files
+        );
     }
 }
