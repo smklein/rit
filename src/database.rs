@@ -60,11 +60,12 @@ pub trait Storable {
     // worth restructuring this code to reduce the number of invocations.
 
     fn encoded_raw(&self) -> Vec<u8> {
+        let data = self.data();
         let mut content = Vec::new();
         content.extend_from_slice(self.type_name().as_bytes());
         content.extend_from_slice(b" ");
-        content.extend_from_slice(format!("{}\0", self.data().len()).as_bytes());
-        content.extend_from_slice(self.data());
+        content.extend_from_slice(format!("{}\0", data.len()).as_bytes());
+        content.extend_from_slice(data);
         content
     }
 

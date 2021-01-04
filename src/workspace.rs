@@ -3,7 +3,7 @@ use std::fs::Metadata;
 use std::path::{Path, PathBuf};
 
 /// A file path, relative to the workspace origin.
-#[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub struct WorkspacePath {
     path: PathBuf,
 }
@@ -62,12 +62,12 @@ impl Workspace {
         std::fs::metadata(real_path).map_err(|e| anyhow!(e))
     }
 
-    /// Returns a sorted list of files within the workspace, all
-    /// relative to the provided path.
+    /// Returns a list of files within the workspace, all relative to the
+    /// provided path.
+    ///
+    /// The files are not necessarily returned in sorted order.
     pub fn list_files(&self) -> Result<Vec<WorkspacePath>> {
-        let mut list = self.list_files_r(None)?;
-        list.sort();
-        Ok(list)
+        self.list_files_r(None)
     }
 
     // Recursive helper for list_files.
@@ -180,7 +180,8 @@ mod tests {
         dir.create(TestPath::File("file.txt")).unwrap();
 
         let workspace = Workspace::new(dir.0.path());
-        let files = workspace.list_files().unwrap();
+        let mut files = workspace.list_files().unwrap();
+        files.sort();
 
         assert_eq!(
             vec![
@@ -199,11 +200,12 @@ mod tests {
         let dir = TestDir::new("test_ignore_git").unwrap();
         dir.create(TestPath::Dir(".git")).unwrap();
         dir.create(TestPath::File(".git/objects")).unwrap();
-        dir.create(TestPath::Dir("not-git-dir")).unwrap();
         dir.create(TestPath::File("not-git-file")).unwrap();
+        dir.create(TestPath::Dir("not-git-dir")).unwrap();
 
         let workspace = Workspace::new(dir.0.path());
-        let files = workspace.list_files().unwrap();
+        let mut files = workspace.list_files().unwrap();
+        files.sort();
 
         assert_eq!(
             vec![

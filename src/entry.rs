@@ -1,5 +1,5 @@
 use crate::database::ObjectID;
-use crate::workspace::WorkspacePath;
+use crate::workspace::{Workspace, WorkspacePath};
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 
@@ -7,6 +7,7 @@ use std::path::Path;
 pub enum Mode {
     ReadWriteExecute,
     ReadWrite,
+    Directory,
 }
 
 impl Mode {
@@ -14,10 +15,13 @@ impl Mode {
         match *self {
             Mode::ReadWriteExecute => "100755",
             Mode::ReadWrite => "100644",
+            Mode::Directory => "040000",
         }
     }
 }
 
+/// An Entry contains the information necessary to represent
+/// a line within a tree.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Entry {
     path: WorkspacePath,
