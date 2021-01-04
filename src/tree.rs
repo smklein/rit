@@ -2,6 +2,7 @@ use crate::database::Storable;
 use crate::entry::Entry;
 use crate::workspace::{Workspace, WorkspacePath};
 use anyhow::{anyhow, Result};
+use lazy_init::Lazy;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -89,7 +90,8 @@ impl TreeNode {
 pub struct Tree {
     // Sorted list of entries by name.
     entries: Vec<Entry>,
-    data: Vec<u8>,
+    // Lazily initialized view of data.
+    data: Lazy<Vec<u8>>,
 }
 
 impl Tree {
@@ -139,26 +141,10 @@ impl Tree {
 
     pub fn new(mut entries: Vec<Entry>) -> Tree {
         entries.sort();
-        let data = entries
-            .iter()
-            .map(|entry| {
-                println!("Tree entry path: {}", entry.path().display());
-                // Entry format: "{MODE} {NAME}\0{OID}"
-                vec![
-                    format!("{} ", entry.mode().as_str()).as_bytes(),
-                    entry.path_bytes(),
-                    &[b'\0'],
-                    entry.oid().as_bytes(),
-                ]
-                .iter()
-                .map(|slice| slice.to_vec())
-                .flatten()
-                .collect::<Vec<u8>>()
-            })
-            .flatten()
-            .collect::<Vec<u8>>();
-
-        Tree { entries, data }
+        Tree {
+            entries,
+            data: Lazy::new(),
+        }
     }
 }
 
@@ -168,6 +154,6 @@ impl Storable for Tree {
     }
 
     fn data(&self) -> &Vec<u8> {
-        &self.data
+        &self.data.get_or_create(|| self.serialize())
     }
 }
